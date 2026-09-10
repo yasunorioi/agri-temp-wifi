@@ -114,14 +114,17 @@ agriha/2/sys/temp_node_01/online   1 / 0  (LWT, retain)
 
 ## ビルド / 書き込み
 
-```powershell
-$env:PYTHONIOENCODING="utf-8"
-cd C:\Users\kita_\Documents\agri-temp-wifi
-& "C:\Users\kita_\.platformio\penv\Scripts\pio.exe" run -e m5atomu-wifi
-& "C:\Users\kita_\.platformio\penv\Scripts\pio.exe" run -e m5atomu-wifi -t upload --upload-port COM3
+`pio` を PATH に通せば **Windows / Linux 共通**（`platformio.ini` は OS 非依存・
+`upload_port` 未指定＝自動検出。Win=`COMx` / Linux は FTDI なので `/dev/ttyUSB*`）:
+
+```bash
+pio run -e m5atomu-wifi
+pio run -e m5atomu-wifi -t upload
 ```
 
-- git-bash からは pio を叩けない（idf_tools が MSys 非対応）。**ネイティブ PowerShell で**。
+> 🛠 **ビルド環境（Windows / Linux 共用）・Linux 初回セットアップ（udev 等）** →
+> [agri-node-poe-core/docs/cross-platform-build.md](https://github.com/yasunorioi/agri-node-poe-core/blob/main/docs/cross-platform-build.md)
+
 - **`upload_speed = 115200`**。この FTDI FT232R は 921600 でも 460800 でも
   ボーレート切替直後に `Unable to verify flash chip connection (No serial data received)`
   で落ちる。115200 なら確実（1MB で約 90 秒）。
@@ -132,9 +135,9 @@ cd C:\Users\kita_\Documents\agri-temp-wifi
   この機は SPIFFS を使わないので損はない。
   > **パーティションテーブルはアプリイメージの外にあるので OTA では変えられない。**
   > 既に旧レイアウトで動いているノードを移すときは USB で1回焼く必要がある。以後は OTA でよい。
-- USB 書き込みは初回だけ。以後は HTTP OTA:
-  ```powershell
-  curl.exe -F firmware=@.pio\build\m5atomu-wifi\firmware.bin http://agri-temp-01.local/api/ota
+- USB 書き込みは初回だけ。以後は HTTP OTA（Win は `curl.exe`）:
+  ```bash
+  curl -F firmware=@.pio/build/m5atomu-wifi/firmware.bin http://agri-temp-01.local/api/ota
   ```
 
 ## 初回セットアップ
@@ -194,10 +197,10 @@ core が使えないのは、あれが 3.x の `NetworkClientSecure` と ETH 前
 
 リリース手順（**タグと asset 名が規約どおりでないと、タグは見つかるのに download で 404 する**）:
 
-```powershell
-& "C:\Users\kita_\.platformio\penv\Scripts\pio.exe" run -e m5atomu-wifi
-Copy-Item .pio\build\m5atomu-wifi\firmware.bin agri-temp-wifi.bin
-gh release create v0.2.0 agri-temp-wifi.bin --title "v0.2.0" --notes "..."
+```bash
+pio run -e m5atomu-wifi
+gh release create v0.2.0 ".pio/build/m5atomu-wifi/firmware.bin#agri-temp-wifi.bin" \
+  --title v0.2.0 --notes "..."
 ```
 
 - タグ = `v` + `FW_VERSION`（`main.cpp`）
