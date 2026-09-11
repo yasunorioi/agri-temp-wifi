@@ -1,6 +1,6 @@
 # agri-temp-wifi
 
-M5Stack **ATOM U** + **DS18B20 × N**（1-Wire マルチドロップ）の多点温度ノード。
+M5Stack [**ATOM U**](https://docs.m5stack.com/en/core/ATOM%20U) + **DS18B20 × N**（1-Wire マルチドロップ）の多点温度ノード。
 `agri-*` ファミリーの **WiFi 機**。既定は house2 の水温（`WaterTemp`）。
 
 前身: `Documents/Arduino/M5Atom-ds18b20_influxdb/M5Atom-ds18b20_influxdb.ino`
