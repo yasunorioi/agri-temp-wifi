@@ -265,10 +265,23 @@ core が使えないのは、あれが 3.x の `NetworkClientSecure` と ETH 前
 リリース手順（**タグと asset 名が規約どおりでないと、タグは見つかるのに download で 404 する**）:
 
 ```bash
+pio run -e m5atoms3-wifi
 pio run -e m5atomu-wifi
-gh release create v0.2.0 ".pio/build/m5atomu-wifi/firmware.bin#agri-temp-wifi.bin" \
-  --title v0.2.0 --notes "..."
+
+# asset 名 = ファイル名。いったん規約名にコピーしてから上げる
+cp .pio/build/m5atoms3-wifi/firmware.bin agri-temp-wifi-atoms3.bin
+cp .pio/build/m5atomu-wifi/firmware.bin  agri-temp-wifi.bin
+gh release create v0.3.0 agri-temp-wifi-atoms3.bin agri-temp-wifi.bin \
+  --target main --title v0.3.0 --notes "..."
 ```
+
+> ⚠️ **`gh release create "path#name"` では asset 名は変わらない。** `#` の後ろは
+> *label*（表示名）にしかならず、実体は `name=firmware.bin` のまま上がる。
+> 2 ボード分を同時に上げるとその `firmware.bin` が衝突して
+> `HTTP 404` でアップロードごと失敗する（v0.3.0 で実際に踏んだ）。
+> **必ず規約名に `cp` してから渡すこと。**
+> なお `--target` はブランチ名（`main`）を渡す。短縮 SHA は
+> `Release.target_commitish is invalid` で弾かれる。
 
 - タグ = `v` + `FW_VERSION`（`main.cpp`）
 - asset 名 = `FW_BIN_NAME` と完全一致。**v0.3.0 からボードごとに別名**で、
