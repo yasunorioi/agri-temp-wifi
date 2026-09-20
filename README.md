@@ -213,7 +213,21 @@ pio run -e m5atomu-wifi -t upload
      そちらへ繋がる**ことがある（AtomS3 実機で実際に起きた）
 2. スマホ/PC で繋いで現地 WiFi を設定
 3. `http://agri-temp-01.local/` を開く
-4. `/config` で MQTT Host（`yasu-hp.local`、既定で入っている）とスロットを設定
+4. `/config` で **Node ID** / **Hostname** / MQTT Host（`yasu-hp.local`、既定で入っている）と
+   スロットを設定
+   - **Node ID はノードごとに必ず変える**（既定は `temp_node_01`）。これは MQTT の client id
+     そのものなので、2台が同じ id で繋ぐとブローカが先の接続を蹴り、両方が接続と切断を
+     延々と繰り返す。LWT トピック `<prefix>/sys/<Node ID>/online` も決める。15 文字まで。
+     **再起動不要**（保存時に MQTT を張り直す）
+   - **Hostname は再起動するまで mDNS / ArduinoOTA に反映されない**。`/config` が自動再起動
+     するのは DATA pin を変えたときだけ。リモートで再起動したいなら同じ bin を
+     `/api/ota` に投げるのが早い（実測 8 秒）
+   - **スロットの topic は既定のままにしない**。素の `WaterTemp` は全ノードの初期値で、
+     放置すると他ノードが捨てた系列を拾い直して衝突する。`WaterTempTank` のように
+     型名で区別する（既存: `WaterTempTap` / `WaterTempNear` / `WaterTempPump` / `WaterTempFar`）
+   - **topic を変えたら旧 topic の retain を消す**: `mosquitto_pub -t <旧topic> -r -n`。
+     消さないと固まった値が永久に残り、消費側からは生きているように見える。
+     **`sys_prefix` を変えても slot topic は追従しない**（別フィールド）ので両方直すこと
 5. Dashboard に温度が出る → broker で `agriha/2/sensor/WaterTemp` を確認
 
 ## API
