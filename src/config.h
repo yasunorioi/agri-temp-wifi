@@ -99,15 +99,30 @@ inline void setDefaults() {
   g_cfg.ccm_priority   = 29;
   strlcpy(g_cfg.ccm_ntype, "cMC", sizeof(g_cfg.ccm_ntype));
 
-  // Default routing: house2 water temperature. Slot 0 owns the bare type and
-  // the rest take the "/N" instance suffix already used on this broker for
-  // repeated types (agriha/2/actuator/Relay/2, .../VenSdWinopr/2, ...).
+  // NO DEFAULT TOPIC — on purpose. An empty topic means "do not publish".
+  //
+  // This used to default to agriha/2/sensor/WaterTemp (and .../WaterTemp/N for
+  // the rest), which made every freshly flashed node land on the same generic
+  // name. That name is not a routing choice, it is the family's "not configured
+  // yet" placeholder: every temp node in the fleet passed through it and then
+  // moved to a qualified type name (WaterTempTap / Near / Pump / Far / Tank).
+  // Nodes that lingered there wrote into each other's history series — one
+  // series ended up holding samples from two different physical probes, and the
+  // whole set (566 samples across four series) had to be deleted by hand on
+  // 2026-09-20.
+  //
+  // Publishing nothing until an operator names the topic costs one commissioning
+  // step and makes that class of collision impossible. The dashboard flags any
+  // bound probe that has no topic, so a silent node is visibly silent on purpose
+  // rather than mysteriously absent from the broker.
+  //
+  // Naming rules: mqtt-topics.md 0.3.1 (qualified type name, never a bare type,
+  // never an instance number) and 0.6 (topic lifecycle).
   for (int i = 0; i < CFG_MAX_SLOTS; i++) {
     SlotConfig &s = g_cfg.slot[i];
     s.rom[0] = '\0';
     snprintf(s.label, sizeof(s.label), "probe%d", i + 1);
-    if (i == 0) strlcpy(s.topic, "agriha/2/sensor/WaterTemp", sizeof(s.topic));
-    else        snprintf(s.topic, sizeof(s.topic), "agriha/2/sensor/WaterTemp/%d", i + 1);
+    s.topic[0] = '\0';                 // = not published until configured
     strlcpy(s.ccm_type, "WaterTemp", sizeof(s.ccm_type));
     s.ccm_room   = 1;
     s.ccm_region = 13;

@@ -1,7 +1,8 @@
 # agri-temp-wifi
 
 **DS18B20 × N**（1-Wire マルチドロップ）の多点温度ノード。
-`agri-*` ファミリーの **WiFi 機**。既定は house2 の水温（`WaterTemp`）。
+`agri-*` ファミリーの **WiFi 機**。
+**MQTT トピックに既定値は無い**（v0.3.3〜）。設置時に必ず命名する — 理由は下記「初回セットアップ」。
 
 **対応ボードは2種類**。差分は `src/board.h` と `platformio.ini` の `-D` フラグだけに
 閉じてあり、`sensors` / `mqtt_pub` / `ccm_pub` / `webui` / `self_update` はボード非依存。
@@ -118,10 +119,14 @@ Dashboard に「Unassigned probes」として出る** ＝ センサーを足し�
 スロットごとに **1物理量1トピック**、`retain`。`agri-env-poe` と同じ正準形:
 
 ```
-agriha/2/sensor/WaterTemp      {"value":21.44,"unit":"C","ts":1788334103}
-agriha/2/sensor/WaterTemp/2    {"value":19.80,"unit":"C","ts":1788334103}
-agriha/2/sys/temp_node_01/online   1 / 0  (LWT, retain)
+agriha/farm/sensor/WaterTempTank     {"value":24.12,"unit":"C","ts":1789881535}
+agriha/farm/sys/temp_tank_01/online  1 / 0  (LWT, retain)
 ```
+
+現用ノード（No.2/No.3 共用の給水タンク水温計）の実際の出力。
+トピックの決め方は正準仕様書
+[`Arsprout-RESTAPI/mqtt-topics.md`](https://github.com/yasunorioi/Arsprout-RESTAPI/blob/main/mqtt-topics.md)
+§0.3.1（限定子付き型名）と §0.6（ライフサイクル）に従う。
 
 2本目以降の `/N` サフィックスは、このブローカーで同一型が複数ある時に既に使われている
 慣行（`agriha/2/actuator/Relay/2`、`agriha/1/actuator/VenSdWinopr/2`）に合わせたもの。
@@ -222,13 +227,18 @@ pio run -e m5atomu-wifi -t upload
    - **Hostname は再起動するまで mDNS / ArduinoOTA に反映されない**。`/config` が自動再起動
      するのは DATA pin を変えたときだけなので、変えたら Config ページの **Reboot** ボタン
      （または `curl -X POST http://<host>/api/reboot`）を押す
-   - **スロットの topic は既定のままにしない**。素の `WaterTemp` は全ノードの初期値で、
-     放置すると他ノードが捨てた系列を拾い直して衝突する。`WaterTempTank` のように
-     型名で区別する（既存: `WaterTempTap` / `WaterTempNear` / `WaterTempPump` / `WaterTempFar`）
+   - **スロットの topic を入れるまで MQTT には何も出ない**（v0.3.3〜、既定は空）。
+     Dashboard に温度は出るが「not set / nothing is being published」と警告が出る。
+     これは故障ではなく、名前を決めるまで publish しない設計
+   - 名前は**型名の末尾に短い物理的 descriptor**を付けて区別する。
+     `WaterTempTank` のように。既存: `WaterTempTap` / `WaterTempNear` /
+     `WaterTempPump` / `WaterTempFar`。**素の `WaterTemp` と `/2` のような番号は使わない**
+     （v0.3.2 以前は素の `WaterTemp` が既定だったため、全ノードが同じ名前に着地して
+     互いの履歴系列に書き込む事故が起きた。2026-09-20 に 566 サンプルを手で削除している）
    - **topic を変えたら旧 topic の retain を消す**: `mosquitto_pub -t <旧topic> -r -n`。
      消さないと固まった値が永久に残り、消費側からは生きているように見える。
      **`sys_prefix` を変えても slot topic は追従しない**（別フィールド）ので両方直すこと
-5. Dashboard に温度が出る → broker で `agriha/2/sensor/WaterTemp` を確認
+5. Dashboard に温度が出る → broker で設定したトピックを確認
 
 ## API
 

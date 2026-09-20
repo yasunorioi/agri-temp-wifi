@@ -77,6 +77,7 @@ inline String renderSensors() {
   s = F("<h3>Temperature</h3><table>"
         "<tr><th>Slot</th><th>Label</th><th>ROM</th><th>Temp</th><th>Topic</th></tr>");
   bool anySlot = false;
+  int  noTopic  = 0;
   for (int i = 0; i < CFG_MAX_SLOTS; i++) {
     const SlotConfig &sl = g_cfg.slot[i];
     if (!sl.rom[0]) continue;
@@ -85,10 +86,25 @@ inline String renderSensors() {
     s += "</td><td class=rom>"; s += sl.rom; s += "</td><td>";
     if (g_slotOk[i]) { s += "<span class=ok>"; s += String(g_slotTemp[i], 2); s += " &deg;C</span>"; }
     else             { s += F("<span class=bad>-- (no reading)</span>"); }
-    s += "</td><td>"; s += esc(sl.topic); s += "</td></tr>";
+    s += "</td><td>";
+    if (sl.topic[0]) s += esc(sl.topic);
+    else { s += F("<span class=warn>not set</span>"); noTopic++; }
+    s += "</td></tr>";
   }
   if (!anySlot) s += F("<tr><td colspan=5 class=warn>No probe bound yet — see Config</td></tr>");
   s += F("</table>");
+
+  // A bound probe with no topic is the expected state of a freshly flashed node:
+  // there is deliberately no default topic (see config.h). Say so loudly, or the
+  // node reads fine on this page while publishing nothing and looks broken.
+  if (noTopic) {
+    s += F("<p class=warn><b>");
+    s += noTopic;
+    s += F(" probe(s) have no MQTT topic — nothing is being published.</b><br>"
+           "Set one in <a href='/config'>Config</a>. Use a qualified type name "
+           "(e.g. <code>agriha/farm/sensor/WaterTempTank</code>), never a bare "
+           "type and never an instance number — see mqtt-topics.md &sect;0.3.1.</p>");
+  }
 
   // Probes physically on the bus that no slot claims: the thing you actually
   // want to see after adding or swapping a sensor.
