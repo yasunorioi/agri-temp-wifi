@@ -23,6 +23,13 @@
 #include <Arduino.h>
 #include <Preferences.h>
 
+// Default 1-Wire DATA pin, set per board in platformio.ini: G25 on the ATOM U
+// (hand-wired), G1 on the AtomS3 Lite (Grove white). Only the value a blank
+// NVS starts from — /config overrides it at runtime. See src/board.h.
+#ifndef OW_DEFAULT_PIN
+#define OW_DEFAULT_PIN 25
+#endif
+
 static const int CFG_MAX_SLOTS = 8;
 
 struct SlotConfig {
@@ -42,7 +49,7 @@ struct AppConfig {
   char     hostname[32];
 
   // 1-Wire bus
-  uint8_t  ow_pin;                  // DATA pin (default G25, as wired on this unit)
+  uint8_t  ow_pin;                  // DATA pin (board default: OW_DEFAULT_PIN)
   uint8_t  resolution;              // 9..12 bits (12 = 0.0625 C, 750 ms)
   uint16_t meas_interval_s;         // bus poll cadence
 
@@ -76,7 +83,7 @@ inline void setDefaults() {
   strlcpy(g_cfg.node_id,  "temp_node_01", sizeof(g_cfg.node_id));
   strlcpy(g_cfg.hostname, "agri-temp-01", sizeof(g_cfg.hostname));
 
-  g_cfg.ow_pin          = 25;       // matches the original M5Atom-ds18b20 sketch
+  g_cfg.ow_pin          = OW_DEFAULT_PIN;   // G25 on ATOM U, G1 (Grove) on AtomS3
   g_cfg.resolution      = 12;
   g_cfg.meas_interval_s = 10;
 

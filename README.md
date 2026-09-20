@@ -1,7 +1,22 @@
 # agri-temp-wifi
 
-M5Stack [**ATOM U**](https://docs.m5stack.com/en/core/ATOM%20U) + **DS18B20 × N**（1-Wire マルチドロップ）の多点温度ノード。
+**DS18B20 × N**（1-Wire マルチドロップ）の多点温度ノード。
 `agri-*` ファミリーの **WiFi 機**。既定は house2 の水温（`WaterTemp`）。
+
+**対応ボードは2種類**。差分は `src/board.h` と `platformio.ini` の `-D` フラグだけに
+閉じてあり、`sensors` / `mqtt_pub` / `ccm_pub` / `webui` / `self_update` はボード非依存。
+
+| env | ボード | MCU | Flash | 1-Wire 既定 | 状態 |
+|---|---|---|---|---|---|
+| **`m5atoms3-wifi`**（既定） | [AtomS3 Lite](https://docs.m5stack.com/en/core/AtomS3%20Lite) | ESP32-S3 | 8MB | **G1**（Grove 白） | 実機稼働 |
+| `m5atomu-wifi` | [ATOM U](https://docs.m5stack.com/en/core/ATOM%20U) | ESP32-PICO-D4 | 4MB | G25（手配線） | 棚上げ（配線待ち） |
+
+| | ATOM U | AtomS3 Lite |
+|---|---|---|
+| ステータス LED | SK6812 on G27（`M5.dis`） | WS2812C on **G35**（FastLED 直叩き） |
+| ボタン | G39（`M5.Btn`） | **G41**（active-low を直読み） |
+| USB | USB-A 直挿し（書込は外付け FTDI） | **USB-C ネイティブ CDC**（変換チップ無し） |
+| ボードライブラリ | `m5stack/M5Atom` | 無し（S3 非対応なので意図的に外してある） |
 
 前身: `Documents/Arduino/M5Atom-ds18b20_influxdb/M5Atom-ds18b20_influxdb.ino`
 （OneWire を手書きデコード＋WiFi ハードコード＋InfluxDB UDP 直投げ）。
@@ -31,6 +46,28 @@ ATOM U は底面拡張が無く PoE ベースを履けない。よって **`agri
 ---
 
 ## 配線
+
+### AtomS3 Lite（Grove ユニット・推奨）
+
+Grove DS18B20 ユニット（スイッチサイエンス 10979 / 防水プローブ 2m）は
+**プルアップ内蔵**なので、Grove ポートに挿すだけで終わり。
+
+```
+AtomS3 Lite  Grove (HY2.0-4P)
+  G1  (白) ──── DQ      ← DATA はこちら
+  G2  (黄) ──── 未使用
+  5V  (赤) ──── VCC
+  GND (黒) ──── GND
+```
+
+- **DATA = G1**。シルクの `SIG`/黄 = G2 に見えるが **G2 では何も読めない**。
+  これは推測ではなく `agri-temp-poe`（AtomS3 Lite + PoE ベース、現場3台）で
+  実機確認済みの事実。
+- 多点化は同じバスに DQ / VCC / GND を並列（マルチドロップ）。
+- 裸の DS18B20 を直結するなら下の ATOM U と同じく 4.7k プルアップが要る。
+  その場合は **3.3V 給電＋3.3V プルアップ**に揃えること（理由は下記）。
+
+### ATOM U（裸プローブを手配線）
 
 ```
 ATOM U            DS18B20 (パラサイト給電は非推奨・3線で使う)
@@ -115,20 +152,43 @@ agriha/2/sys/temp_node_01/online   1 / 0  (LWT, retain)
 ## ビルド / 書き込み
 
 `pio` を PATH に通せば **Windows / Linux 共通**（`platformio.ini` は OS 非依存・
-`upload_port` 未指定＝自動検出。Win=`COMx` / Linux は FTDI なので `/dev/ttyUSB*`）:
+`upload_port` 未指定＝自動検出。ATOM U は FTDI なので Win=`COMx` / Linux=`/dev/ttyUSB*`、
+AtomS3 Lite はネイティブ USB CDC なので Win=`COMx` / Linux=`/dev/ttyACM*`）。
+`default_envs = m5atoms3-wifi` なので、env を省くと AtomS3 が対象になる:
 
 ```bash
-pio run -e m5atomu-wifi
+pio run                          # = -e m5atoms3-wifi
+pio run -t upload
+
 pio run -e m5atomu-wifi -t upload
 ```
 
 > 🛠 **ビルド環境（Windows / Linux 共用）・Linux 初回セットアップ（udev 等）** →
 > [agri-node-poe-core/docs/cross-platform-build.md](https://github.com/yasunorioi/agri-node-poe-core/blob/main/docs/cross-platform-build.md)
 
+- 実測 — AtomS3: RAM 18.2% / **Flash 44.4%**（3.34MB スロット）／
+  ATOM U: RAM 16.8% / Flash 60.3%（1.87MB スロット、`min_spiffs.csv`）。
+
+### AtomS3 Lite 固有
+
+- **パーティション指定は無し**（ボード既定の `default_8MB.csv`）。8MB あるので
+  OTA スロットが 2面 × 3.3MB 取れ、ATOM U の約3倍の余裕がある。
+  `min_spiffs` を被せる必要は無い。
+- `-DARDUINO_USB_CDC_ON_BOOT=1`。USB-UART 変換チップが無く、`Serial` は
+  ESP32-S3 のネイティブ USB CDC そのもの。`upload_speed` はボード既定の 460800
+  （CDC なのでボーレートは実質飾り。ATOM U の 115200 縛りとは無関係）。
+- **シリアルモニタの罠**: USB-Serial-JTAG では **RTS が EN、DTR が GPIO0** に
+  繋がっている。pyserial や一部のターミナルは open 時に両方を assert するので、
+  **チップがリセット状態で保持されて一切出力が出ない**。生の pyserial で覗くなら
+  open 直後に `setRTS(False); setDTR(False)` すること。さらに **RTS でリセットを
+  打つと S3 自身の USB が落ちて既存ハンドルが死ぬ**（例外も出ず 0 バイトになる）。
+  そもそも状態は WebUI（`/api/status`）で全部見えるので、普段シリアルは要らない。
+
+### ATOM U 固有
+
 - **`upload_speed = 115200`**。この FTDI FT232R は 921600 でも 460800 でも
   ボーレート切替直後に `Unable to verify flash chip connection (No serial data received)`
   で落ちる。115200 なら確実（1MB で約 90 秒）。
-- 実測: RAM 16.8% / Flash 60.3%（espressif32 6.x、`min_spiffs.csv`）。
 - **パーティションは `min_spiffs.csv`**。セルフ更新が mbedTLS を抱き込むので、
   既定のパーティションだと Flash 90.4% まで埋まって余地が無くなる。
   min_spiffs は OTA スロット2面（セルフ更新に必須）を保ったまま各面を 1.9MB に広げる。
@@ -137,13 +197,20 @@ pio run -e m5atomu-wifi -t upload
   > 既に旧レイアウトで動いているノードを移すときは USB で1回焼く必要がある。以後は OTA でよい。
 - USB 書き込みは初回だけ。以後は HTTP OTA（Win は `curl.exe`）:
   ```bash
-  curl -F firmware=@.pio/build/m5atomu-wifi/firmware.bin http://agri-temp-01.local/api/ota
+  curl -F firmware=@.pio/build/m5atoms3-wifi/firmware.bin http://agri-temp-01.local/api/ota
   ```
+  > **env を間違えないこと。** ESP32-S3 と ESP32-PICO-D4 はアーキテクチャが違うので、
+  > 相手違いの bin を送ってもイメージヘッダ検証で弾かれる（＝無駄足になる）。
 
 ## 初回セットアップ
 
 1. 焼く → 起動すると WiFi 未設定なので AP **`agri-temp-setup`** が立つ（192.168.4.1）
    - 起動時にボタンを押しっぱなしにすると、設定済みでも強制的にポータルを開ける
+     （AtomS3 Lite は G41 = 天面の丸ボタン、ATOM U は G39）
+   - ポータルは 180 秒でタイムアウトして再起動する。取り逃すと AP が一瞬消えるが、
+     すぐ立ち上がり直すので繋ぎ直せばよい
+   - **NVS に前の用途の WiFi 資格情報が残っていると、ポータルを無視して勝手に
+     そちらへ繋がる**ことがある（AtomS3 実機で実際に起きた）
 2. スマホ/PC で繋いで現地 WiFi を設定
 3. `http://agri-temp-01.local/` を開く
 4. `/config` で MQTT Host（`yasu-hp.local`、既定で入っている）とスロットを設定
@@ -204,10 +271,20 @@ gh release create v0.2.0 ".pio/build/m5atomu-wifi/firmware.bin#agri-temp-wifi.bi
 ```
 
 - タグ = `v` + `FW_VERSION`（`main.cpp`）
-- asset 名 = `FW_BIN_NAME` = `agri-temp-wifi.bin` と完全一致
+- asset 名 = `FW_BIN_NAME` と完全一致。**v0.3.0 からボードごとに別名**で、
+  `platformio.ini` の `-DFW_BIN_NAME_STR` が決める:
+
+  | env | asset 名 |
+  |---|---|
+  | `m5atoms3-wifi` | `agri-temp-wifi-atoms3.bin` |
+  | `m5atomu-wifi`  | `agri-temp-wifi.bin` |
+
+  同じ release に両方の bin を上げておけば、各ノードは自分の分だけを拾う。
+  名前を共用すると S3 機が PICO 用イメージを掴んで更新に失敗するので、分けてある。
 
 ## 残作業
 
-- **実機での複数プローブ検証**（現時点でバスに応答なし＝配線確認待ち）。
+- **AtomS3 機の複数プローブ検証**（現在1本のみ）。
+- ATOM U 機は**バスに応答なし＝配線確認待ち**のまま棚上げ。
 - ROM ↔ 実体の対応付け（1本ずつ握って Dashboard で確認）。
 - CCM を使うなら yasu-hp の bridge に `sender_override` を1行追加。

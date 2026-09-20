@@ -108,13 +108,19 @@ inline bool sensorsAutoBind() {
 }
 
 // Field diagnostic: when the configured pin enumerates nothing, walk the pins
-// the ATOM U can actually expose and report which one (if any) has devices on
+// this board can actually expose and report which one (if any) has devices on
 // it. Purely advisory — it never rewrites the config, it just turns "probes=0"
-// from a dead end into "your bus is on G25". Runs once at boot.
-//
-// The candidate list deliberately excludes GPIO6-11 and 16/17 (the ESP32-PICO-
-// D4's embedded flash) and 27 (the on-board SK6812 status LED).
+// from a dead end into "your bus is on G1". Runs once at boot.
+#if defined(BOARD_ATOMS3)
+// AtomS3 Lite: Grove brings out G1 (white) / G2 (yellow); the side header adds
+// G5-G8 and G38/G39. Excluded: G35 (on-board WS2812), G41 (button), G43/G44
+// (UART0), and the SPI flash/PSRAM pins the S3 module reserves internally.
+static const uint8_t OW_CANDIDATE_PINS[] = { 1, 2, 5, 6, 7, 8, 38, 39 };
+#else
+// ATOM U: excludes GPIO6-11 and 16/17 (the ESP32-PICO-D4's embedded flash) and
+// 27 (the on-board SK6812 status LED).
 static const uint8_t OW_CANDIDATE_PINS[] = { 26, 32, 25, 33, 21, 22, 19, 23 };
+#endif
 
 inline int owCountOnPin(uint8_t pin) {
   OneWire probe(pin);
