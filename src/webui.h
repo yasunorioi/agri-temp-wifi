@@ -232,7 +232,12 @@ inline String pageConfig() {
   }
   s += F("</table><p><input type=submit value='Save'></p></form>"
          "<p><button onclick=\"fetch('/api/scan',{method:'POST'}).then(()=>location.reload())\">"
-         "Rescan bus</button></p></div></body></html>");
+         "Rescan bus</button> "
+         "<button onclick=\"if(confirm('Reboot the node now? It will be offline for ~10 s.'))"
+         "fetch('/api/reboot',{method:'POST'}).then(()=>{document.body.textContent="
+         "'rebooting - reconnect in ~10 s'});\">Reboot</button></p>"
+         "<p>Hostname changes need a reboot; Node ID and the MQTT settings do not.</p>"
+         "</div></body></html>");
   return s;
 }
 
@@ -435,6 +440,17 @@ inline void webBegin(const char *fw_name, const char *fw_version) {
          if (ok) ESP.restart();
        },
        onOtaUpload);
+  // Manual reboot. mDNS and ArduinoOTA bind the hostname once in setup(), so a
+  // hostname change only takes effect after a restart — and until now the only
+  // way to get one remotely was to re-flash the same image over /api/ota.
+  // POST-only on purpose: a GET would let a link prefetch or a crawler reboot
+  // the node.
+  w.on("/api/reboot", HTTP_POST, [] {
+    Serial.println("[WEB] reboot requested");
+    web().send(200, "text/plain", "rebooting\n");
+    delay(300);            // let the response reach the client before EN drops
+    ESP.restart();
+  });
   w.on("/api/scan", HTTP_POST, [] {
     sensorsScan();
     String s; webStatusJson(s);

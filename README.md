@@ -220,8 +220,8 @@ pio run -e m5atomu-wifi -t upload
      延々と繰り返す。LWT トピック `<prefix>/sys/<Node ID>/online` も決める。15 文字まで。
      **再起動不要**（保存時に MQTT を張り直す）
    - **Hostname は再起動するまで mDNS / ArduinoOTA に反映されない**。`/config` が自動再起動
-     するのは DATA pin を変えたときだけ。リモートで再起動したいなら同じ bin を
-     `/api/ota` に投げるのが早い（実測 8 秒）
+     するのは DATA pin を変えたときだけなので、変えたら Config ページの **Reboot** ボタン
+     （または `curl -X POST http://<host>/api/reboot`）を押す
    - **スロットの topic は既定のままにしない**。素の `WaterTemp` は全ノードの初期値で、
      放置すると他ノードが捨てた系列を拾い直して衝突する。`WaterTempTank` のように
      型名で区別する（既存: `WaterTempTap` / `WaterTempNear` / `WaterTempPump` / `WaterTempFar`）
@@ -237,6 +237,7 @@ pio run -e m5atomu-wifi -t upload
 | `GET /api/status` | `fw_name`/`fw_version`/`ip`/`link`/`mqtt_connected`/`ccm_enabled`/`ow_pin`/`probe_count`/`probes[]`/`slots[]` |
 | `GET /api/config` | 設定 JSON |
 | `POST /api/scan` | 1-Wire バス再列挙 |
+| `POST /api/reboot` | 再起動（Hostname 変更を mDNS に反映させるときに使う。GET は不可） |
 | `POST /api/check` | GitHub Release を今すぐ確認 |
 | `POST /api/update` | セルフ更新を予約（次の `poll()` で焼く。更新が無ければ 409） |
 | `POST /api/ota` | multipart ファーム更新（手動） |
