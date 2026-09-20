@@ -194,7 +194,13 @@ inline String pageConfig() {
   row("Resolution (9-12 bit)",              webIn("owres", String(g_cfg.resolution), "number"));
   row("Measure interval (s)",               webIn("msint", String(g_cfg.meas_interval_s), "number"));
   s += F("</table><h3>MQTT</h3><table>");
-  row("Hostname (mDNS .local)", webIn("host",   esc(g_cfg.hostname)));
+  // node_id is the MQTT client id AND the <prefix>/sys/<id>/online LWT topic.
+  // Both are re-sent on the reconnect that webApplyForm() forces, so unlike the
+  // hostname this takes effect without a reboot. 15 chars max (char[16]).
+  row("Node ID (MQTT client id + sys topic, max 15)",
+                                webIn("nodeid", esc(g_cfg.node_id)));
+  row("Hostname (mDNS .local, needs a reboot)",
+                                webIn("host",   esc(g_cfg.hostname)));
   row("MQTT Host",              webIn("mqhost", esc(g_cfg.mqtt_host)));
   row("MQTT Port",              webIn("mqport", String(g_cfg.mqtt_port), "number"));
   row("MQTT User",              webIn("mquser", esc(g_cfg.mqtt_user)));
@@ -295,6 +301,7 @@ inline bool webApplyForm() {
   }
   if (w.hasArg("msint")) g_cfg.meas_interval_s = (uint16_t)max(1L, w.arg("msint").toInt());
 
+  str("nodeid", g_cfg.node_id,    sizeof(g_cfg.node_id));
   str("host",   g_cfg.hostname,   sizeof(g_cfg.hostname));
   str("mqhost", g_cfg.mqtt_host,  sizeof(g_cfg.mqtt_host));
   if (w.hasArg("mqport")) g_cfg.mqtt_port = (uint16_t)w.arg("mqport").toInt();
