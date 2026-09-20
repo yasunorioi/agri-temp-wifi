@@ -169,8 +169,17 @@ inline String pageDashboard() {
   return s;
 }
 
-inline String webIn(const char *name, const String &val, const char *type = "text") {
-  return "<input type=" + String(type) + " name='" + String(name) + "' value='" + val + "'>";
+// `ph` renders as a placeholder: grey sample text that shows the shape of a
+// valid value, vanishes as soon as the operator types, and is NEVER submitted —
+// so an empty field stays empty. Used for the slot topics, which have no
+// default any more (config.h) and would otherwise be a blank box with no clue
+// what belongs in it.
+inline String webIn(const char *name, const String &val, const char *type = "text",
+                    const char *ph = nullptr) {
+  String s = "<input type=" + String(type) + " name='" + String(name) +
+             "' value='" + val + "'";
+  if (ph && *ph) { s += " placeholder='"; s += ph; s += "'"; }
+  return s + ">";
 }
 
 // <select> of every ROM currently on the bus, plus whatever this slot already
@@ -232,14 +241,34 @@ inline String pageConfig() {
   s += F("</table>"
          "<h3>Slots</h3>"
          "<p>Bind a probe (ROM address) to a slot. Empty ROM = slot inactive. "
-         "Empty Topic = not published. Empty CCM identifier = no CCM for that slot.</p>"
+         "Empty Topic = <b>not published</b> — a slot with no topic is silent on "
+         "purpose. Empty CCM identifier = no CCM for that slot.</p>"
+         // There is deliberately no default topic, so the field starts blank.
+         // A blank box with no clue is its own trap, hence this worked example
+         // block outside the form: the real names currently in the fleet.
+         "<p class=warn>MQTT topic has no default — name it when you install the "
+         "node. Shape: <code>agriha/&lt;scope&gt;/&lt;category&gt;/"
+         "&lt;Type&gt;&lt;descriptor&gt;</code></p>"
+         "<table><tr><th>Example (in use today)</th><th>What it is</th></tr>"
+         "<tr><td class=rom>agriha/farm/sensor/WaterTempTank</td>"
+             "<td>supply tank shared by house 2 + 3</td></tr>"
+         "<tr><td class=rom>agriha/1/sensor/WaterTempTap</td><td>house 1, tap</td></tr>"
+         "<tr><td class=rom>agriha/2/sensor/WaterTempNear</td><td>house 2, near side</td></tr>"
+         "<tr><td class=rom>agriha/2/sensor/WaterTempPump</td><td>house 2, pump</td></tr>"
+         "<tr><td class=rom>agriha/3/sensor/WaterTempFar</td><td>house 3, far side</td></tr>"
+         "</table>"
+         "<p><code>scope</code> = the house number, or <code>farm</code> when two or "
+         "more houses share the thing being measured. Always add a descriptor: "
+         "never the bare type (<code>WaterTemp</code>) and never an instance number "
+         "(<code>WaterTemp/2</code>) — see mqtt-topics.md &sect;0.3.1.</p>"
          "<table><tr><th>#</th><th>ROM</th><th>Label</th><th>MQTT topic</th>"
          "<th>CCM identifier</th><th>room</th><th>region</th><th>order</th><th>offset &deg;C</th></tr>");
   for (int i = 0; i < CFG_MAX_SLOTS; i++) {
     const SlotConfig &sl = g_cfg.slot[i];
     s += "<tr><td>"; s += i; s += "</td><td>"; s += romSelect(i); s += "</td>";
     s += "<td>" + webIn(("lab" + String(i)).c_str(), esc(sl.label))    + "</td>";
-    s += "<td>" + webIn(("top" + String(i)).c_str(), esc(sl.topic))    + "</td>";
+    s += "<td>" + webIn(("top" + String(i)).c_str(), esc(sl.topic), "text",
+                        "agriha/farm/sensor/WaterTempTank")               + "</td>";
     s += "<td>" + webIn(("typ" + String(i)).c_str(), esc(sl.ccm_type)) + "</td>";
     s += "<td>" + webIn(("rm"  + String(i)).c_str(), String(sl.ccm_room),   "number") + "</td>";
     s += "<td>" + webIn(("rg"  + String(i)).c_str(), String(sl.ccm_region), "number") + "</td>";
