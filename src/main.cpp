@@ -34,7 +34,7 @@
 #include "webui.h"
 
 #define FW_NAME     "agri-temp-wifi"
-#define FW_VERSION  "0.3.4"
+#define FW_VERSION  "0.3.5"
 // GitHub release self-update. The tag must be vX.Y.Z and the release asset
 // must be named exactly FW_BIN_NAME, or the device will find the tag but 404
 // on the download.

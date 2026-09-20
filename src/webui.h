@@ -207,8 +207,30 @@ inline String romSelect(int i) {
   return s;
 }
 
+// The hostname this node announced when it booted.
+//
+// Unlike agri-node-poe-core (which calls mdnsRestart() on a hostname change),
+// this node binds the name once in setup() — MDNS.begin() / ArduinoOTA
+// .setHostname() — so nothing picks up a new hostname until it restarts, and
+// the DHCP-registered name is only sent when the lease is taken. Keeping the
+// boot value lets /config say so instead of silently lying.
+inline char *bootHostname() { static char h[32] = ""; return h; }
+
 inline String pageConfig() {
   String s = pageHead("Config");
+
+  // Hostname edited since boot. Everything that uses it is bound once in
+  // setup(), so nothing has picked up the new name yet.
+  if (bootHostname()[0] && strcmp(bootHostname(), g_cfg.hostname) != 0) {
+    s += F("<div class=sec style='border-left:3px solid #e8a33d'>"
+           "<p class=warn style='margin:0'><b>Hostname changed since boot.</b><br>"
+           "mDNS, ArduinoOTA and the DHCP-registered name all still answer to "
+           "<code>");
+    s += bootHostname();
+    s += F("</code>. Nothing uses <code>");
+    s += g_cfg.hostname;
+    s += F("</code> until this node reboots — use the Reboot button below.</p></div>");
+  }
   auto row = [&](const char *label, const String &input) {
     s += "<tr><th>"; s += label; s += "</th><td>"; s += input; s += "</td></tr>";
   };
@@ -464,6 +486,8 @@ inline void onOtaUpload() {
 }
 
 inline void webBegin(const char *fw_name, const char *fw_version) {
+  // Remember the name we came up with, so /config can flag a later change.
+  strlcpy(bootHostname(), g_cfg.hostname, 32);
   webFwName() = fw_name;
   webFwVer()  = fw_version;
   WebServer &w = web();
